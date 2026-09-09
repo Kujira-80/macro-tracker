@@ -436,7 +436,7 @@
       }
     });
 
-    // 400px width keeps base64 payload under 35KB for rapid upload
+    // 240px width at 0.4 quality keeps base64 payload under 10KB
     function resizeImageToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -444,14 +444,14 @@
           const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 400;
+            const MAX_WIDTH = 240;
             const scale = Math.min(MAX_WIDTH / img.width, 1);
             canvas.width = Math.round(img.width * scale);
             canvas.height = Math.round(img.height * scale);
             
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.6).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.4).split(',')[1]);
           };
           img.onerror = reject;
           img.src = e.target.result;
@@ -463,7 +463,6 @@
 
     async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
-      // Direct generateContent endpoint with gemini-3.6-flash
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
       const prompt = `Analyze this food image. Estimate portion sizes and return ONLY a single valid raw JSON object (no commentary, no markdown) with keys:
@@ -483,8 +482,9 @@
         }]
       };
 
+      // 45-second timeout ensures slower mobile uploads have plenty of buffer
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 25000);
+      const timeout = setTimeout(() => controller.abort(), 45000);
 
       try {
         const response = await fetch(url, {
