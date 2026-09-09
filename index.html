@@ -43,6 +43,7 @@
     .log-section { margin-top: 28px; }
     .log-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); margin-bottom: 12px; }
     
+    /* Swipeable List Items */
     .swipe-container { position: relative; margin-bottom: 10px; border-radius: 14px; overflow: hidden; background: #e2e8f0; }
     .swipe-actions { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 0.9rem; color: white; }
     .swipe-action-left { background: var(--edit); width: 50%; height: 100%; display: flex; align-items: center; padding-left: 20px; }
@@ -70,6 +71,7 @@
     .nav-btn { flex: 1; border: none; background: #0f172a; color: white; border-radius: 12px; padding: 14px 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
     .nav-btn.secondary { background: #3b82f6; }
 
+    /* Modals */
     #scanner-modal, #portion-modal, #loading-modal { 
       display: none; 
       position: fixed; 
@@ -211,7 +213,7 @@
     <div class="loading-card">
       <div class="spinner"></div>
       <div style="font-weight: 700; font-size: 1rem;">Analyzing Meal...</div>
-      <div style="font-size: 0.8rem; color: var(--subtext); margin-top: 6px;">Estimating portions & macros</div>
+      <div style="font-size: 0.8rem; color: var(--subtext); margin-top: 6px;">Gemini is estimating portion sizes & macros</div>
     </div>
   </div>
 
@@ -220,7 +222,7 @@
     let log = JSON.parse(localStorage.getItem("macro_items") || "[]");
     let scanner = null;
     let isScanning = false;
-    let editingIndex = null;
+    let editingIndex = null; // Track if we are editing an existing item
 
     function render() {
       localStorage.setItem("macro_items", JSON.stringify(log));
@@ -270,6 +272,7 @@
       document.getElementById("bar-fat").style.width = Math.min((fat / 70) * 100, 100) + "%";
     }
 
+    // Touch gesture logic for Swiping
     function setupSwipe(el, index) {
       let startX = 0;
       let currentX = 0;
@@ -284,6 +287,7 @@
       el.addEventListener("touchmove", (e) => {
         if (!isSwiping) return;
         currentX = e.touches[0].clientX - startX;
+        // Limit maximum slide distance
         if (Math.abs(currentX) < 140) {
           el.style.transform = `translateX(${currentX}px)`;
         }
@@ -295,17 +299,20 @@
         el.style.transition = "transform 0.2s ease";
 
         if (currentX > 80) {
+          // Swiped Right -> Trigger Edit
           el.style.transform = "translateX(0px)";
           const item = log[index];
           editingIndex = index;
           openEditModal(item.name, item.cals, item.carbs, item.protein, item.fat, item.grams, false, true);
         } else if (currentX < -80) {
+          // Swiped Left -> Trigger Delete
           el.style.transform = "translateX(-100%)";
           setTimeout(() => {
             log.splice(index, 1);
             render();
           }, 180);
         } else {
+          // Snap back
           el.style.transform = "translateX(0px)";
         }
       });
@@ -343,16 +350,17 @@
       };
 
       if (editingIndex !== null) {
-        log[editingIndex] = updatedItem;
+        log[editingIndex] = updatedItem; // Update existing
         editingIndex = null;
       } else {
-        log.unshift(updatedItem);
+        log.unshift(updatedItem); // Add new
       }
 
       portionModal.style.display = "none";
       render();
     });
 
+    // Barcode Scanner
     document.getElementById("open-scanner").addEventListener("click", () => {
       scannerModal.style.display = "flex";
       isScanning = true;
@@ -406,6 +414,7 @@
       }
     }
 
+    // Photo Meal (Gemini 3.6 Flash + Downsampling)
     const fileInput = document.getElementById("camera-file");
     document.getElementById("snap-meal").addEventListener("click", () => {
       const apiKey = localStorage.getItem("gemini_key");
@@ -432,7 +441,6 @@
       }
     });
 
-    // Fast image compression: 420px max width at 0.5 quality keeps upload ~25-35KB
     function resizeImageToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -440,14 +448,14 @@
           const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 420;
+            const MAX_WIDTH = 600;
             const scale = Math.min(MAX_WIDTH / img.width, 1);
-            canvas.width = Math.round(img.width * scale);
-            canvas.height = Math.round(img.height * scale);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
             
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.5).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.6).split(',')[1]);
           };
           img.onerror = reject;
           img.src = e.target.result;
@@ -457,12 +465,11 @@
       });
     }
 
-    // High-speed call: zero-budget reasoning + 150 token cap
     async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
-      const prompt = `Identify food and estimate macros. Output ONLY raw JSON: {"name": string, "cals": integer, "grams": integer, "carbs": integer, "protein": integer, "fat": integer}`;
+      const prompt = `Analyze this food image. Estimate portion sizes and return ONLY valid raw JSON with keys: "name" (short string), "cals" (integer), "grams" (integer), "carbs" (integer), "protein" (integer), "fat" (integer). No commentary, no markdown.`;
 
       const payload = {
         contents: [{
@@ -472,14 +479,12 @@
           ]
         }],
         generationConfig: {
-          response_mime_type: "application/json",
-          max_output_tokens: 150,
-          thinking_config: { thinking_budget: 0 }
+          response_mime_type: "application/json"
         }
       };
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
       try {
         const response = await fetch(url, {
