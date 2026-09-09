@@ -22,7 +22,8 @@
     
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     header h1 { font-size: 1.25rem; font-weight: 800; }
-    header button { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--subtext); }
+    .header-actions { display: flex; gap: 12px; }
+    .icon-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--subtext); }
 
     .summary-card { background: var(--card); padding: 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid var(--border); }
     .cal-math { display: flex; justify-content: space-around; text-align: center; margin-bottom: 24px; align-items: center; }
@@ -45,11 +46,12 @@
     .log-item .details { font-size: 0.8rem; color: var(--subtext); margin-top: 4px; }
     .log-item .cals { font-weight: 800; font-size: 1.05rem; }
 
-    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 20px; padding: 16px 20px 24px; max-width: 480px; margin: 0 auto; z-index: 50; }
-    .nav-btn { flex: 1; border: none; background: #0f172a; color: white; border-radius: 12px; padding: 14px; font-weight: 600; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 12px; padding: 16px 20px 24px; max-width: 480px; margin: 0 auto; z-index: 50; }
+    .nav-btn { flex: 1; border: none; background: #0f172a; color: white; border-radius: 12px; padding: 14px 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .nav-btn.secondary { background: #3b82f6; }
 
-    /* Modal Overlays with explicit high z-index */
-    #scanner-modal, #portion-modal { 
+    /* Modals & Overlays */
+    #scanner-modal, #portion-modal, #loading-modal { 
       display: none; 
       position: fixed; 
       top: 0; left: 0; width: 100vw; height: 100vh;
@@ -62,25 +64,33 @@
     #reader { width: 100%; max-width: 360px; border-radius: 16px; overflow: hidden; background: #000; }
     .close-btn { margin-top: 20px; background: #334155; color: white; border: none; padding: 12px 28px; border-radius: 30px; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
 
-    /* Portion Box */
-    .portion-box { background: white; width: 100%; max-width: 360px; border-radius: 20px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .portion-box { background: white; width: 100%; max-width: 380px; border-radius: 20px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
     .portion-box h3 { font-size: 1.15rem; font-weight: 800; margin-bottom: 6px; }
     .portion-box .meta { font-size: 0.85rem; color: var(--subtext); margin-bottom: 20px; }
-    .input-group { margin-bottom: 16px; }
-    .input-group label { display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--subtext); margin-bottom: 6px; }
-    .input-group input { width: 100%; padding: 12px 14px; font-size: 1.2rem; font-weight: 700; border: 2px solid var(--border); border-radius: 10px; outline: none; }
+    .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .input-group { margin-bottom: 12px; }
+    .input-group label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--subtext); margin-bottom: 4px; }
+    .input-group input { width: 100%; padding: 10px 12px; font-size: 1rem; font-weight: 700; border: 2px solid var(--border); border-radius: 10px; outline: none; }
     .input-group input:focus { border-color: var(--primary); }
-    .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
     .modal-actions button { flex: 1; padding: 14px; border-radius: 10px; font-weight: 700; font-size: 0.95rem; border: none; cursor: pointer; }
     .btn-save { background: var(--primary); color: white; }
     .btn-dismiss { background: #f1f5f9; color: var(--text); }
+
+    /* Loading Spinner Card */
+    .loading-card { background: white; padding: 30px; border-radius: 20px; text-align: center; max-width: 280px; }
+    .spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
   <header>
     <h1>Diary</h1>
-    <button id="reset-btn" title="Reset Log">↺</button>
+    <div class="header-actions">
+      <button class="icon-btn" id="api-btn" title="API Key Settings">⚙️</button>
+      <button class="icon-btn" id="reset-btn" title="Reset Today">↺</button>
+    </div>
   </header>
 
   <div class="summary-card">
@@ -126,7 +136,9 @@
   </div>
 
   <div class="bottom-nav">
-    <button class="nav-btn" id="open-scanner">📷 Scan Barcode</button>
+    <button class="nav-btn" id="open-scanner">📷 Barcode</button>
+    <button class="nav-btn secondary" id="snap-meal">🍽️ Photo Meal</button>
+    <input type="file" id="camera-file" accept="image/*" capture="environment" style="display: none;" />
   </div>
 
   <!-- Barcode Scanner Modal -->
@@ -135,15 +147,41 @@
     <button class="close-btn" id="close-scanner">Cancel</button>
   </div>
 
-  <!-- Portion / Grams Modal -->
+  <!-- Portion / Edit Modal -->
   <div id="portion-modal">
     <div class="portion-box">
       <h3 id="item-title">Product</h3>
-      <div class="meta" id="item-meta">Per 100g: 0 kcal</div>
+      <div class="meta" id="item-meta">Review & Log</div>
       
       <div class="input-group">
-        <label>Grams Consumed</label>
-        <input type="number" id="portion-input" value="100" min="1" step="any" inputmode="decimal" />
+        <label>Food / Description</label>
+        <input type="text" id="name-input" />
+      </div>
+
+      <div class="input-grid">
+        <div class="input-group">
+          <label>Calories (kcal)</label>
+          <input type="number" id="cals-input" inputmode="numeric" />
+        </div>
+        <div class="input-group">
+          <label>Weight (g/serving)</label>
+          <input type="number" id="grams-input" inputmode="numeric" value="100" />
+        </div>
+      </div>
+
+      <div class="input-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div class="input-group">
+          <label>Carbs</label>
+          <input type="number" id="carbs-input" inputmode="decimal" />
+        </div>
+        <div class="input-group">
+          <label>Protein</label>
+          <input type="number" id="protein-input" inputmode="decimal" />
+        </div>
+        <div class="input-group">
+          <label>Fat</label>
+          <input type="number" id="fat-input" inputmode="decimal" />
+        </div>
       </div>
 
       <div class="modal-actions">
@@ -153,12 +191,21 @@
     </div>
   </div>
 
+  <!-- Loading Modal -->
+  <div id="loading-modal">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <div style="font-weight: 700; font-size: 1rem;">Analyzing Meal...</div>
+      <div style="font-size: 0.8rem; color: var(--subtext); margin-top: 6px;">Gemini is estimating portion sizes & macros</div>
+    </div>
+  </div>
+
   <script>
     const GOAL = 2200;
     let log = JSON.parse(localStorage.getItem("macro_items") || "[]");
     let scanner = null;
-    let pendingProduct = null;
     let isScanning = false;
+    let base100g = null; // Used when scaling barcode items
 
     function render() {
       localStorage.setItem("macro_items", JSON.stringify(log));
@@ -167,7 +214,7 @@
       listEl.innerHTML = "";
 
       if (log.length === 0) {
-        listEl.innerHTML = `<div style="text-align:center; padding: 30px; color: var(--subtext); font-size: 0.9rem;">No items scanned yet.</div>`;
+        listEl.innerHTML = `<div style="text-align:center; padding: 30px; color: var(--subtext); font-size: 0.9rem;">No items logged yet.</div>`;
       }
 
       log.forEach(item => {
@@ -180,7 +227,7 @@
         row.className = "log-item";
         row.innerHTML = `
           <div>
-            <div class="name">${item.name} <span class="portion-tag">${item.grams || 100}g</span></div>
+            <div class="name">${item.name} <span class="portion-tag">${item.grams ? item.grams + 'g' : '1 serving'}</span></div>
             <div class="details">C: ${item.carbs}g · P: ${item.protein}g · F: ${item.fat}g</div>
           </div>
           <div class="cals">${item.cals}</div>
@@ -199,9 +246,54 @@
       document.getElementById("bar-fat").style.width = Math.min((fat / 70) * 100, 100) + "%";
     }
 
+    // Modal helpers
     const scannerModal = document.getElementById("scanner-modal");
     const portionModal = document.getElementById("portion-modal");
+    const loadingModal = document.getElementById("loading-modal");
 
+    function openEditModal(name, cals, carbs, protein, fat, grams = 100, isFromBarcode = false) {
+      document.getElementById("name-input").value = name;
+      document.getElementById("cals-input").value = Math.round(cals);
+      document.getElementById("carbs-input").value = Math.round(carbs);
+      document.getElementById("protein-input").value = Math.round(protein);
+      document.getElementById("fat-input").value = Math.round(fat);
+      document.getElementById("grams-input").value = Math.round(grams);
+      document.getElementById("item-title").innerText = isFromBarcode ? "Barcode Found" : "Meal Recognized";
+      document.getElementById("item-meta").innerText = isFromBarcode ? "Scale to grams consumed:" : "Estimated macros (editable):";
+      portionModal.style.display = "flex";
+    }
+
+    // Automatically recalculate if user tweaks grams on barcode items
+    document.getElementById("grams-input").addEventListener("input", (e) => {
+      if (!base100g) return;
+      const g = parseFloat(e.target.value) || 0;
+      const factor = g / 100;
+      document.getElementById("cals-input").value = Math.round(base100g.cals * factor);
+      document.getElementById("carbs-input").value = Math.round(base100g.carbs * factor);
+      document.getElementById("protein-input").value = Math.round(base100g.protein * factor);
+      document.getElementById("fat-input").value = Math.round(base100g.fat * factor);
+    });
+
+    document.getElementById("cancel-portion").addEventListener("click", () => {
+      base100g = null;
+      portionModal.style.display = "none";
+    });
+
+    document.getElementById("confirm-portion").addEventListener("click", () => {
+      log.unshift({
+        name: document.getElementById("name-input").value || "Meal",
+        grams: parseFloat(document.getElementById("grams-input").value) || 100,
+        cals: parseInt(document.getElementById("cals-input").value) || 0,
+        carbs: parseInt(document.getElementById("carbs-input").value) || 0,
+        protein: parseInt(document.getElementById("protein-input").value) || 0,
+        fat: parseInt(document.getElementById("fat-input").value) || 0
+      });
+      base100g = null;
+      portionModal.style.display = "none";
+      render();
+    });
+
+    // Barcode scanner
     document.getElementById("open-scanner").addEventListener("click", () => {
       scannerModal.style.display = "flex";
       isScanning = true;
@@ -229,61 +321,127 @@
 
     async function onScanMatch(code) {
       if (!isScanning) return;
-      isScanning = false; // prevent double fire
+      isScanning = false;
       stopCamera();
 
       try {
         const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
         const data = await res.json();
-        
         if (data.status === 1) {
           const n = data.product.nutriments || {};
-          pendingProduct = {
-            name: data.product.product_name || "Food Item",
-            cals100: Math.round(n["energy-kcal_100g"] || 0),
-            carbs100: parseFloat(n["carbohydrates_100g"] || 0),
-            protein100: parseFloat(n["proteins_100g"] || 0),
-            fat100: parseFloat(n["fat_100g"] || 0)
+          base100g = {
+            cals: n["energy-kcal_100g"] || 0,
+            carbs: n["carbohydrates_100g"] || 0,
+            protein: n["proteins_100g"] || 0,
+            fat: n["fat_100g"] || 0
           };
-
-          document.getElementById("item-title").innerText = pendingProduct.name;
-          document.getElementById("item-meta").innerText = `Base (per 100g): ${pendingProduct.cals100} kcal`;
-          document.getElementById("portion-input").value = "100";
-          portionModal.style.display = "flex";
+          openEditModal(data.product.product_name || "Food Item", base100g.cals, base100g.carbs, base100g.protein, base100g.fat, 100, true);
         } else {
-          alert("Barcode scanned (" + code + ") but not found in database.");
+          alert("Barcode (" + code + ") not found.");
         }
       } catch (err) {
         alert("Lookup failed. Check connection.");
       }
     }
 
-    document.getElementById("cancel-portion").addEventListener("click", () => {
-      pendingProduct = null;
-      portionModal.style.display = "none";
-    });
-
-    document.getElementById("confirm-portion").addEventListener("click", () => {
-      const grams = parseFloat(document.getElementById("portion-input").value);
-      if (!grams || grams <= 0) {
-        alert("Please enter a valid weight in grams.");
+    // Photo Meal AI (Gemini)
+    const fileInput = document.getElementById("camera-file");
+    document.getElementById("snap-meal").addEventListener("click", () => {
+      const apiKey = localStorage.getItem("gemini_key");
+      if (!apiKey) {
+        promptApiKey();
         return;
       }
+      fileInput.click();
+    });
 
-      const factor = grams / 100;
-      log.unshift({
-        name: pendingProduct.name,
-        grams: Math.round(grams),
-        cals: Math.round(pendingProduct.cals100 * factor),
-        carbs: Math.round(pendingProduct.carbs100 * factor),
-        protein: Math.round(pendingProduct.protein100 * factor),
-        fat: Math.round(pendingProduct.fat100 * factor)
+    fileInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      loadingModal.style.display = "flex";
+      try {
+        const base64Data = await resizeImageToBase64(file);
+        await callGeminiVision(base64Data);
+      } catch (err) {
+        alert("Analysis error: " + err.message);
+      } finally {
+        loadingModal.style.display = "none";
+        fileInput.value = ""; // reset
+      }
+    });
+
+    // Resize image in browser canvas to keep upload lightning fast
+    function resizeImageToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 800;
+            const scale = MAX_WIDTH / img.width;
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
+          };
+          img.src = readerEvent.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function callGeminiVision(base64Image) {
+      const apiKey = localStorage.getItem("gemini_key");
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+      const prompt = `Analyze this food image. Estimate portion sizes and return ONLY a valid JSON object (no markdown, no backticks) with keys:
+      "name" (short description of the meal),
+      "cals" (total calories as integer),
+      "grams" (estimated total weight in grams as integer),
+      "carbs" (grams as integer),
+      "protein" (grams as integer),
+      "fat" (grams as integer)`;
+
+      const payload = {
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+          ]
+        }]
+      };
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
 
-      pendingProduct = null;
-      portionModal.style.display = "none";
-      render();
-    });
+      const resData = await response.json();
+      if (resData.error) throw new Error(resData.error.message);
+
+      let text = resData.candidates[0].content.parts[0].text.trim();
+      text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const meal = JSON.parse(text);
+
+      base100g = null; // Not tied to 100g scale
+      openEditModal(meal.name, meal.cals, meal.carbs, meal.protein, meal.fat, meal.grams, false);
+    }
+
+    // Settings / API Key modal
+    function promptApiKey() {
+      const current = localStorage.getItem("gemini_key") || "";
+      const key = prompt("Enter your free Gemini API Key from Google AI Studio:", current);
+      if (key !== null) {
+        localStorage.setItem("gemini_key", key.trim());
+        if (key.trim()) alert("API key saved to this device!");
+      }
+    }
+    document.getElementById("api-btn").addEventListener("click", promptApiKey);
 
     document.getElementById("reset-btn").addEventListener("click", () => {
       if (confirm("Reset today's diary?")) {
