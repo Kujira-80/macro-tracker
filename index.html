@@ -43,7 +43,6 @@
     .log-section { margin-top: 28px; }
     .log-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); margin-bottom: 12px; }
     
-    /* Swipeable List Items */
     .swipe-container { position: relative; margin-bottom: 10px; border-radius: 14px; overflow: hidden; background: #e2e8f0; }
     .swipe-actions { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 0.9rem; color: white; }
     .swipe-action-left { background: var(--edit); width: 50%; height: 100%; display: flex; align-items: center; padding-left: 20px; }
@@ -213,7 +212,7 @@
     <div class="loading-card">
       <div class="spinner"></div>
       <div style="font-weight: 700; font-size: 1rem;">Analyzing Meal...</div>
-      <div style="font-size: 0.8rem; color: var(--subtext); margin-top: 6px;">Gemini is estimating portion sizes & macros</div>
+      <div style="font-size: 0.8rem; color: var(--subtext); margin-top: 6px;">Gemini 3.6 Flash estimating portion sizes & macros</div>
     </div>
   </div>
 
@@ -409,7 +408,7 @@
       }
     }
 
-    // Photo Meal using Interactions API & gemini-3.6-flash
+    // Photo Meal using gemini-3.6-flash
     const fileInput = document.getElementById("camera-file");
     document.getElementById("snap-meal").addEventListener("click", () => {
       const apiKey = localStorage.getItem("gemini_key");
@@ -436,7 +435,7 @@
       }
     });
 
-    // Downscale aggressively to 400px and 0.5 quality (~30-40KB total payload)
+    // Aggressive downsampling to 300px prevents upload and base64 transmission lags
     function resizeImageToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -444,7 +443,7 @@
           const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 400;
+            const MAX_WIDTH = 300;
             const scale = Math.min(MAX_WIDTH / img.width, 1);
             canvas.width = Math.round(img.width * scale);
             canvas.height = Math.round(img.height * scale);
@@ -469,21 +468,29 @@
 Return ONLY a valid JSON object matching this structure:
 {"name": "Food description", "cals": 80, "grams": 150, "carbs": 19, "protein": 1, "fat": 0}`;
 
+      // Proper multimodal schema structure for Interactions API targeting gemini-3.6-flash
       const payload = {
         model: "gemini-3.6-flash",
         input: [
-          { type: "text", text: promptText },
           {
-            type: "image",
-            data: base64Image,
-            mime_type: "image/jpeg"
+            turn: {
+              role: "user",
+              content: [
+                { text: promptText },
+                {
+                  inline_data: {
+                    mime_type: "image/jpeg",
+                    data: base64Image
+                  }
+                }
+              ]
+            }
           }
         ]
       };
 
-      // Extended timeout to 45 seconds to give the server room to complete reasoning
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
+      const timeout = setTimeout(() => controller.abort(), 20000);
 
       try {
         const response = await fetch(url, {
@@ -499,6 +506,7 @@ Return ONLY a valid JSON object matching this structure:
           throw new Error(resData.error.message);
         }
 
+        // Parse through possible output properties returned by 3.6 interactions
         let text = "";
         if (resData.output_text) {
           text = resData.output_text;
@@ -507,6 +515,8 @@ Return ONLY a valid JSON object matching this structure:
           text = modelStep ? (modelStep.output_text || JSON.stringify(modelStep)) : JSON.stringify(resData.steps);
         } else if (resData.outputs && resData.outputs.length) {
           text = resData.outputs[0].text || "";
+        } else {
+          text = JSON.stringify(resData);
         }
 
         const match = text.match(/\{[\s\S]*\}/);
@@ -526,12 +536,12 @@ Return ONLY a valid JSON object matching this structure:
         );
       } catch (err) {
         if (err.name === 'AbortError') {
-          throw new Error("Analysis timed out. The server is taking longer than 45s to process.");
+          throw new Error("Analysis timed out. Please check your signal.");
         }
         throw err;
       }
     }
-    
+
     function promptApiKey() {
       const current = localStorage.getItem("gemini_key") || "";
       const key = prompt("Enter your Gemini API Key:", current);
