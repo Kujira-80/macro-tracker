@@ -465,45 +465,64 @@
       });
     }
 
-    async function callGeminiVision(base64Image) {
+async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-      const prompt = `Analyze this food image. Estimate portion sizes and return ONLY valid raw JSON with keys: "name" (short string), "cals" (integer), "grams" (integer), "carbs" (integer), "protein" (integer), "fat" (integer). No commentary, no markdown.`;
+      const promptText = `Analyze this meal photo. Estimate weight in grams and macronutrients. Return ONLY raw JSON in this exact shape: {"name":"Orange","cals":62,"grams":130,"carbs":15,"protein":1,"fat":0}`;
 
       const payload = {
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: "image/jpeg", data: base64Image } }
-          ]
-        }],
-        generationConfig: {
-          response_mime_type: "application/json"
-        }
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: promptText },
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: base64Image
+                }
+              }
+            ]
+          }
+        ]
       };
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+      const timeout = setTimeout(() => controller.abort(), 20000);
 
       try {
         const response = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify(payload),
           signal: controller.signal
         });
         clearTimeout(timeout);
 
         const resData = await response.json();
-        if (resData.error) throw new Error(resData.error.message);
+        if (resData.error) {
+          throw new Error(resData.error.message);
+        }
 
         const rawText = resData.candidates[0].content.parts[0].text;
-        const cleanJson = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
-        const meal = JSON.parse(cleanJson);
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error("Could not parse food data from response.");
+
+        const meal = JSON.parse(match[0]);
 
         editingIndex = null;
-        openEditModal(meal.name, meal.cals, meal.carbs, meal.protein, meal.fat, meal.grams, false);
+        openEditModal(
+          meal.name || "Meal",
+          meal.cals || 0,
+          meal.carbs || 0,
+          meal.protein || 0,
+          meal.fat || 0,
+          meal.grams || 100,
+          false
+        );
       } catch (err) {
         if (err.name === 'AbortError') {
           throw new Error("Analysis timed out. Please try again.");
