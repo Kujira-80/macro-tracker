@@ -384,9 +384,10 @@
       });
     }
 
-    async function callGeminiVision(base64Image) {
+async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      // Updated to match the recommended model from the error message
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
       const prompt = `Analyze this food image. Estimate portion sizes and return ONLY a valid JSON object (no markdown, no backticks) with keys:
       "name" (short description of the meal),
