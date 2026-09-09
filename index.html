@@ -384,14 +384,9 @@
       });
     }
 
-    async function callGeminiVision(base64Image) {
+async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
-      
-      // Try gemini-2.5-flash first, fallback to 1.5-flash if there's high traffic
-      const models = [
-        "gemini-2.5-flash",
-        "gemini-1.5-flash"
-      ];
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
       const prompt = `Analyze this food image. Estimate portion sizes and return ONLY a valid JSON object (no markdown, no backticks) with keys:
       "name" (short description of the meal),
@@ -410,23 +405,22 @@
         }]
       };
 
-      let lastError = null;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-      for (const model of models) {
-        try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-          const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
+      const resData = await response.json();
+      if (resData.error) throw new Error(resData.error.message);
 
-          const resData = await response.json();
-          if (resData.error) {
-            lastError = new Error(resData.error.message);
-            continue; // try next model if busy
-          }
+      let text = resData.candidates[0].content.parts[0].text.trim();
+      text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const meal = JSON.parse(text);
 
+      base100g = null;
+      openEditModal(meal.name, meal.cals, meal.carbs, meal.protein, meal.fat, meal.grams, false);
+    }
           let text = resData.candidates[0].content.parts[0].text.trim();
           text = text.replace(/```json/g, "").replace(/```/g, "").trim();
           const meal = JSON.parse(text);
