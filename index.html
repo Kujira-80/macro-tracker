@@ -408,7 +408,7 @@
       }
     }
 
-    // Photo Meal using gemini-3.6-flash
+    // Photo Meal using gemini-3.6-flash Interactions API
     const fileInput = document.getElementById("camera-file");
     document.getElementById("snap-meal").addEventListener("click", () => {
       const apiKey = localStorage.getItem("gemini_key");
@@ -435,7 +435,6 @@
       }
     });
 
-    // Aggressive downsampling to 300px prevents upload and base64 transmission lags
     function resizeImageToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -460,7 +459,7 @@
       });
     }
 
-async function callGeminiVision(base64Image) {
+    async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
       const url = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${apiKey}`;
 
@@ -468,7 +467,6 @@ async function callGeminiVision(base64Image) {
 Return ONLY a valid JSON object matching this structure:
 {"name": "Food description", "cals": 80, "grams": 150, "carbs": 19, "protein": 1, "fat": 0}`;
 
-      // The exact schema the Interactions API requires
       const payload = {
         model: "gemini-3.6-flash",
         input: [
@@ -477,8 +475,8 @@ Return ONLY a valid JSON object matching this structure:
             parts: [
               { text: promptText },
               {
-                inline_data: {
-                  mime_type: "image/jpeg",
+                inlineData: {
+                  mimeType: "image/jpeg",
                   data: base64Image
                 }
               }
@@ -504,43 +502,6 @@ Return ONLY a valid JSON object matching this structure:
           throw new Error(resData.error.message);
         }
 
-        // Parse through possible output properties returned by interactions
-        let text = "";
-        if (resData.output_text) {
-          text = resData.output_text;
-        } else if (resData.steps && resData.steps.length) {
-          const modelStep = resData.steps.find(s => s.type === "model_output" || s.output_text);
-          text = modelStep ? (modelStep.output_text || JSON.stringify(modelStep)) : JSON.stringify(resData.steps);
-        } else if (resData.outputs && resData.outputs.length) {
-          text = resData.outputs[0].text || "";
-        } else {
-          text = JSON.stringify(resData);
-        }
-
-        const match = text.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error("Could not parse food data from response.");
-
-        const meal = JSON.parse(match[0]);
-
-        editingIndex = null;
-        openEditModal(
-          meal.name || "Meal",
-          meal.cals || 0,
-          meal.carbs || 0,
-          meal.protein || 0,
-          meal.fat || 0,
-          meal.grams || 100,
-          false
-        );
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          throw new Error("Analysis timed out. Please check your signal.");
-        }
-        throw err;
-      }
-    }
-
-        // Parse through possible output properties returned by 3.6 interactions
         let text = "";
         if (resData.output_text) {
           text = resData.output_text;
