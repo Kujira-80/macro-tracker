@@ -1,5 +1,4 @@
 # macro-tracker
-macro-tracker
 Here is a complete summary of the progress made on the MacroTracker project today.
 
 1. Authentication & API Key Resolution
