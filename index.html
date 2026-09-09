@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MacroTracker</title>
+  <!-- Barcode scanner engine -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --subtext: #64748b;
+      --carbs: #3b82f6;
+      --protein: #ef4444;
+      --fat: #f59e0b;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 16px; padding-bottom: 100px; max-width: 480px; margin: 0 auto; }
+    
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    header h1 { font-size: 1.25rem; font-weight: 800; }
+    header button { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--subtext); }
+
+    .summary-card { background: var(--card); padding: 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid var(--border); }
+    .cal-math { display: flex; justify-content: space-around; text-align: center; margin-bottom: 24px; align-items: center; }
+    .cal-math .val { font-size: 1.5rem; font-weight: 800; }
+    .cal-math .lbl { font-size: 0.7rem; color: var(--subtext); text-transform: uppercase; font-weight: 600; margin-top: 2px; }
+    .cal-math .operator { font-size: 1.2rem; color: var(--subtext); font-weight: 400; }
+
+    .macros-row { display: flex; gap: 16px; }
+    .macro-col { flex: 1; text-align: center; }
+    .macro-label { font-size: 0.75rem; font-weight: 700; }
+    .macro-amt { font-size: 0.85rem; color: var(--subtext); margin-top: 2px; }
+    .macro-bar-bg { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+    .macro-bar-fill { height: 100%; width: 0%; border-radius: 4px; transition: width 0.4s ease; }
+
+    .log-section { margin-top: 28px; }
+    .log-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); margin-bottom: 12px; }
+    .log-item { background: var(--card); padding: 14px 18px; border-radius: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .log-item .name { font-weight: 600; font-size: 0.95rem; }
+    .log-item .details { font-size: 0.8rem; color: var(--subtext); margin-top: 4px; }
+    .log-item .cals { font-weight: 800; font-size: 1.05rem; }
+
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 20px; padding: 16px 20px 24px; max-width: 480px; margin: 0 auto; z-index: 50; }
+    .nav-btn { flex: 1; border: none; background: #0f172a; color: white; border-radius: 12px; padding: 14px; font-weight: 600; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .nav-btn.secondary { background: #f1f5f9; color: var(--text); }
+
+    /* Scanner Viewport */
+    #scanner-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+    #reader { width: 100%; max-width: 400px; border-radius: 16px; overflow: hidden; }
+    .close-btn { margin-top: 20px; background: #334155; color: white; border: none; padding: 12px 28px; border-radius: 30px; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Diary</h1>
+    <button id="reset-btn" title="Reset Log">↺</button>
+  </header>
+
+  <div class="summary-card">
+    <div class="cal-math">
+      <div>
+        <div class="val" id="cal-goal">2200</div>
+        <div class="lbl">Target</div>
+      </div>
+      <div class="operator">-</div>
+      <div>
+        <div class="val" id="cal-food">0</div>
+        <div class="lbl">Food</div>
+      </div>
+      <div class="operator">=</div>
+      <div>
+        <div class="val" id="cal-remaining" style="color: var(--primary);">2200</div>
+        <div class="lbl">Remaining</div>
+      </div>
+    </div>
+
+    <div class="macros-row">
+      <div class="macro-col">
+        <div class="macro-label">Carbs</div>
+        <div class="macro-amt" id="macro-carbs">0g</div>
+        <div class="macro-bar-bg"><div id="bar-carbs" class="macro-bar-fill" style="background: var(--carbs);"></div></div>
+      </div>
+      <div class="macro-col">
+        <div class="macro-label">Protein</div>
+        <div class="macro-amt" id="macro-protein">0g</div>
+        <div class="macro-bar-bg"><div id="bar-protein" class="macro-bar-fill" style="background: var(--protein);"></div></div>
+      </div>
+      <div class="macro-col">
+        <div class="macro-label">Fat</div>
+        <div class="macro-amt" id="macro-fat">0g</div>
+        <div class="macro-bar-bg"><div id="bar-fat" class="macro-bar-fill" style="background: var(--fat);"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <h2>Today's Meals</h2>
+    <div id="log-list"></div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn" id="open-scanner">📷 Scan Barcode</button>
+  </div>
+
+  <!-- Fullscreen Modal Scanner -->
+  <div id="scanner-modal">
+    <div id="reader"></div>
+    <button class="close-btn" id="close-scanner">Cancel</button>
+  </div>
+
+  <script>
+    const GOAL = 2200;
+    let log = JSON.parse(localStorage.getItem("macro_items") || "[]");
+    let scanner = null;
+
+    function render() {
+      localStorage.setItem("macro_items", JSON.stringify(log));
+      let foodCals = 0, carbs = 0, protein = 0, fat = 0;
+      const listEl = document.getElementById("log-list");
+      listEl.innerHTML = "";
+
+      if (log.length === 0) {
+        listEl.innerHTML = `<div style="text-align:center; padding: 30px; color: var(--subtext); font-size: 0.9rem;">No items scanned yet.</div>`;
+      }
+
+      log.forEach(item => {
+        foodCals += item.cals;
+        carbs += item.carbs;
+        protein += item.protein;
+        fat += item.fat;
+
+        const row = document.createElement("div");
+        row.className = "log-item";
+        row.innerHTML = `
+          <div>
+            <div class="name">${item.name}</div>
+            <div class="details">C: ${item.carbs}g · P: ${item.protein}g · F: ${item.fat}g</div>
+          </div>
+          <div class="cals">${item.cals}</div>
+        `;
+        listEl.appendChild(row);
+      });
+
+      document.getElementById("cal-food").innerText = foodCals;
+      document.getElementById("cal-remaining").innerText = GOAL - foodCals;
+      document.getElementById("macro-carbs").innerText = carbs + "g";
+      document.getElementById("macro-protein").innerText = protein + "g";
+      document.getElementById("macro-fat").innerText = fat + "g";
+
+      document.getElementById("bar-carbs").style.width = Math.min((carbs / 250) * 100, 100) + "%";
+      document.getElementById("bar-protein").style.width = Math.min((protein / 160) * 100, 100) + "%";
+      document.getElementById("bar-fat").style.width = Math.min((fat / 70) * 100, 100) + "%";
+    }
+
+    // Barcode scanner trigger
+    const modal = document.getElementById("scanner-modal");
+    document.getElementById("open-scanner").addEventListener("click", () => {
+      modal.style.display = "flex";
+      scanner = new Html5Qrcode("reader");
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 160 } },
+        onScanMatch
+      ).catch(e => {
+        alert("Camera error: " + e);
+        modal.style.display = "none";
+      });
+    });
+
+    document.getElementById("close-scanner").addEventListener("click", shutScanner);
+
+    function shutScanner() {
+      if (scanner) {
+        scanner.stop().then(() => {
+          modal.style.display = "none";
+        }).catch(() => {
+          modal.style.display = "none";
+        });
+      } else {
+        modal.style.display = "none";
+      }
+    }
+
+    async function onScanMatch(code) {
+      shutScanner();
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+        const data = await res.json();
+        if (data.status === 1) {
+          const n = data.product.nutriments || {};
+          log.unshift({
+            name: data.product.product_name || "Food Item",
+            cals: Math.round(n["energy-kcal_100g"] || 0),
+            carbs: Math.round(n["carbohydrates_100g"] || 0),
+            protein: Math.round(n["proteins_100g"] || 0),
+            fat: Math.round(n["fat_100g"] || 0)
+          });
+          render();
+        } else {
+          alert("Barcode scanned (" + code + "), but product wasn't found in Open Food Facts.");
+        }
+      } catch (err) {
+        alert("Lookup error. Check connection.");
+      }
+    }
+
+    document.getElementById("reset-btn").addEventListener("click", () => {
+      if (confirm("Clear today's log?")) {
+        log = [];
+        render();
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
