@@ -436,6 +436,7 @@
       }
     });
 
+    // Downscale aggressively to 400px and 0.5 quality (~30-40KB total payload)
     function resizeImageToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -443,14 +444,14 @@
           const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 600;
+            const MAX_WIDTH = 400;
             const scale = Math.min(MAX_WIDTH / img.width, 1);
-            canvas.width = img.width * scale;
-            canvas.height = img.height * scale;
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
             
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.6).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.5).split(',')[1]);
           };
           img.onerror = reject;
           img.src = e.target.result;
@@ -480,8 +481,9 @@ Return ONLY a valid JSON object matching this structure:
         ]
       };
 
+      // Extended timeout to 45 seconds to give the server room to complete reasoning
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const timeout = setTimeout(() => controller.abort(), 45000);
 
       try {
         const response = await fetch(url, {
@@ -524,12 +526,12 @@ Return ONLY a valid JSON object matching this structure:
         );
       } catch (err) {
         if (err.name === 'AbortError') {
-          throw new Error("Analysis timed out. Please try again.");
+          throw new Error("Analysis timed out. The server is taking longer than 45s to process.");
         }
         throw err;
       }
     }
-
+    
     function promptApiKey() {
       const current = localStorage.getItem("gemini_key") || "";
       const key = prompt("Enter your Gemini API Key:", current);
