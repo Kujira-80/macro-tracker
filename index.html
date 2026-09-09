@@ -467,12 +467,13 @@
 Return ONLY a valid JSON object matching this structure:
 {"name": "Food description", "cals": 80, "grams": 150, "carbs": 19, "protein": 1, "fat": 0}`;
 
+      // This uses the correct Interactions API Schema: type: "user_input" and a "content" array
       const payload = {
         model: "gemini-3.6-flash",
         input: [
           {
-            role: "user",
-            parts: [
+            type: "user_input",
+            content: [
               { text: promptText },
               {
                 inlineData: {
