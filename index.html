@@ -16,9 +16,11 @@
       --protein: #ef4444;
       --fat: #f59e0b;
       --border: #e2e8f0;
+      --danger: #dc2626;
+      --edit: #2563eb;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 16px; padding-bottom: 100px; max-width: 480px; margin: 0 auto; }
+    body { background: var(--bg); color: var(--text); padding: 16px; padding-bottom: 100px; max-width: 480px; margin: 0 auto; user-select: none; }
     
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     header h1 { font-size: 1.25rem; font-weight: 800; }
@@ -40,7 +42,26 @@
 
     .log-section { margin-top: 28px; }
     .log-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); margin-bottom: 12px; }
-    .log-item { background: var(--card); padding: 14px 18px; border-radius: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    
+    /* Swipeable List Items */
+    .swipe-container { position: relative; margin-bottom: 10px; border-radius: 14px; overflow: hidden; background: #e2e8f0; }
+    .swipe-actions { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 0.9rem; color: white; }
+    .swipe-action-left { background: var(--edit); width: 50%; height: 100%; display: flex; align-items: center; padding-left: 20px; }
+    .swipe-action-right { background: var(--danger); width: 50%; height: 100%; display: flex; align-items: center; justify-content: flex-end; padding-right: 20px; }
+    
+    .log-item {
+      position: relative;
+      background: var(--card);
+      padding: 14px 18px;
+      border-radius: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid var(--border);
+      touch-action: pan-y;
+      transition: transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      z-index: 2;
+    }
     .log-item .name { font-weight: 600; font-size: 0.95rem; }
     .log-item .portion-tag { font-size: 0.75rem; background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 600; }
     .log-item .details { font-size: 0.8rem; color: var(--subtext); margin-top: 4px; }
@@ -50,6 +71,7 @@
     .nav-btn { flex: 1; border: none; background: #0f172a; color: white; border-radius: 12px; padding: 14px 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
     .nav-btn.secondary { background: #3b82f6; }
 
+    /* Modals */
     #scanner-modal, #portion-modal, #loading-modal { 
       display: none; 
       position: fixed; 
@@ -129,7 +151,7 @@
   </div>
 
   <div class="log-section">
-    <h2>Today's Meals</h2>
+    <h2>Today's Meals <span style="font-weight:400; font-size:0.75rem; color:var(--subtext);">(Swipe 👉 edit, 👈 delete)</span></h2>
     <div id="log-list"></div>
   </div>
 
@@ -182,7 +204,7 @@
 
       <div class="modal-actions">
         <button class="btn-dismiss" id="cancel-portion">Cancel</button>
-        <button class="btn-save" id="confirm-portion">Log Food</button>
+        <button class="btn-save" id="confirm-portion">Save Food</button>
       </div>
     </div>
   </div>
@@ -200,7 +222,7 @@
     let log = JSON.parse(localStorage.getItem("macro_items") || "[]");
     let scanner = null;
     let isScanning = false;
-    let base100g = null;
+    let editingIndex = null; // Track if we are editing an existing item
 
     function render() {
       localStorage.setItem("macro_items", JSON.stringify(log));
@@ -212,22 +234,31 @@
         listEl.innerHTML = `<div style="text-align:center; padding: 30px; color: var(--subtext); font-size: 0.9rem;">No items logged yet.</div>`;
       }
 
-      log.forEach(item => {
+      log.forEach((item, index) => {
         foodCals += item.cals;
         carbs += item.carbs;
         protein += item.protein;
         fat += item.fat;
 
-        const row = document.createElement("div");
-        row.className = "log-item";
-        row.innerHTML = `
-          <div>
-            <div class="name">${item.name} <span class="portion-tag">${item.grams ? item.grams + 'g' : '1 serving'}</span></div>
-            <div class="details">C: ${item.carbs}g · P: ${item.protein}g · F: ${item.fat}g</div>
+        const container = document.createElement("div");
+        container.className = "swipe-container";
+
+        container.innerHTML = `
+          <div class="swipe-actions">
+            <div class="swipe-action-left">✏️ Edit</div>
+            <div class="swipe-action-right">🗑️ Delete</div>
           </div>
-          <div class="cals">${item.cals}</div>
+          <div class="log-item" data-index="${index}">
+            <div>
+              <div class="name">${item.name} <span class="portion-tag">${item.grams ? item.grams + 'g' : '1 serving'}</span></div>
+              <div class="details">C: ${item.carbs}g · P: ${item.protein}g · F: ${item.fat}g</div>
+            </div>
+            <div class="cals">${item.cals}</div>
+          </div>
         `;
-        listEl.appendChild(row);
+
+        setupSwipe(container.querySelector(".log-item"), index);
+        listEl.appendChild(container);
       });
 
       document.getElementById("cal-food").innerText = foodCals;
@@ -241,51 +272,95 @@
       document.getElementById("bar-fat").style.width = Math.min((fat / 70) * 100, 100) + "%";
     }
 
+    // Touch gesture logic for Swiping
+    function setupSwipe(el, index) {
+      let startX = 0;
+      let currentX = 0;
+      let isSwiping = false;
+
+      el.addEventListener("touchstart", (e) => {
+        startX = e.touches[0].clientX;
+        isSwiping = true;
+        el.style.transition = "none";
+      }, { passive: true });
+
+      el.addEventListener("touchmove", (e) => {
+        if (!isSwiping) return;
+        currentX = e.touches[0].clientX - startX;
+        // Limit maximum slide distance
+        if (Math.abs(currentX) < 140) {
+          el.style.transform = `translateX(${currentX}px)`;
+        }
+      }, { passive: true });
+
+      el.addEventListener("touchend", () => {
+        if (!isSwiping) return;
+        isSwiping = false;
+        el.style.transition = "transform 0.2s ease";
+
+        if (currentX > 80) {
+          // Swiped Right -> Trigger Edit
+          el.style.transform = "translateX(0px)";
+          const item = log[index];
+          editingIndex = index;
+          openEditModal(item.name, item.cals, item.carbs, item.protein, item.fat, item.grams, false, true);
+        } else if (currentX < -80) {
+          // Swiped Left -> Trigger Delete
+          el.style.transform = "translateX(-100%)";
+          setTimeout(() => {
+            log.splice(index, 1);
+            render();
+          }, 180);
+        } else {
+          // Snap back
+          el.style.transform = "translateX(0px)";
+        }
+      });
+    }
+
     const scannerModal = document.getElementById("scanner-modal");
     const portionModal = document.getElementById("portion-modal");
     const loadingModal = document.getElementById("loading-modal");
 
-    function openEditModal(name, cals, carbs, protein, fat, grams = 100, isFromBarcode = false) {
+    function openEditModal(name, cals, carbs, protein, fat, grams = 100, isFromBarcode = false, isEditExisting = false) {
       document.getElementById("name-input").value = name;
       document.getElementById("cals-input").value = Math.round(cals);
       document.getElementById("carbs-input").value = Math.round(carbs);
       document.getElementById("protein-input").value = Math.round(protein);
       document.getElementById("fat-input").value = Math.round(fat);
       document.getElementById("grams-input").value = Math.round(grams);
-      document.getElementById("item-title").innerText = isFromBarcode ? "Barcode Found" : "Meal Recognized";
-      document.getElementById("item-meta").innerText = isFromBarcode ? "Scale to grams consumed:" : "Estimated macros (editable):";
+      document.getElementById("item-title").innerText = isEditExisting ? "Edit Logged Food" : (isFromBarcode ? "Barcode Found" : "Meal Recognized");
+      document.getElementById("item-meta").innerText = "Tweak values or portion size:";
       portionModal.style.display = "flex";
     }
 
-    document.getElementById("grams-input").addEventListener("input", (e) => {
-      if (!base100g) return;
-      const g = parseFloat(e.target.value) || 0;
-      const factor = g / 100;
-      document.getElementById("cals-input").value = Math.round(base100g.cals * factor);
-      document.getElementById("carbs-input").value = Math.round(base100g.carbs * factor);
-      document.getElementById("protein-input").value = Math.round(base100g.protein * factor);
-      document.getElementById("fat-input").value = Math.round(base100g.fat * factor);
-    });
-
     document.getElementById("cancel-portion").addEventListener("click", () => {
-      base100g = null;
+      editingIndex = null;
       portionModal.style.display = "none";
     });
 
     document.getElementById("confirm-portion").addEventListener("click", () => {
-      log.unshift({
+      const updatedItem = {
         name: document.getElementById("name-input").value || "Meal",
         grams: parseFloat(document.getElementById("grams-input").value) || 100,
         cals: parseInt(document.getElementById("cals-input").value) || 0,
         carbs: parseInt(document.getElementById("carbs-input").value) || 0,
         protein: parseInt(document.getElementById("protein-input").value) || 0,
         fat: parseInt(document.getElementById("fat-input").value) || 0
-      });
-      base100g = null;
+      };
+
+      if (editingIndex !== null) {
+        log[editingIndex] = updatedItem; // Update existing
+        editingIndex = null;
+      } else {
+        log.unshift(updatedItem); // Add new
+      }
+
       portionModal.style.display = "none";
       render();
     });
 
+    // Barcode Scanner
     document.getElementById("open-scanner").addEventListener("click", () => {
       scannerModal.style.display = "flex";
       isScanning = true;
@@ -321,13 +396,16 @@
         const data = await res.json();
         if (data.status === 1) {
           const n = data.product.nutriments || {};
-          base100g = {
-            cals: n["energy-kcal_100g"] || 0,
-            carbs: n["carbohydrates_100g"] || 0,
-            protein: n["proteins_100g"] || 0,
-            fat: n["fat_100g"] || 0
-          };
-          openEditModal(data.product.product_name || "Food Item", base100g.cals, base100g.carbs, base100g.protein, base100g.fat, 100, true);
+          editingIndex = null;
+          openEditModal(
+            data.product.product_name || "Food Item", 
+            n["energy-kcal_100g"] || 0, 
+            n["carbohydrates_100g"] || 0, 
+            n["proteins_100g"] || 0, 
+            n["fat_100g"] || 0, 
+            100, 
+            true
+          );
         } else {
           alert("Barcode (" + code + ") not found.");
         }
@@ -336,6 +414,7 @@
       }
     }
 
+    // Photo Meal (Gemini 3.6 Flash + Downsampling)
     const fileInput = document.getElementById("camera-file");
     document.getElementById("snap-meal").addEventListener("click", () => {
       const apiKey = localStorage.getItem("gemini_key");
@@ -365,37 +444,32 @@
     function resizeImageToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = (readerEvent) => {
+        reader.onload = (e) => {
           const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 800;
-            const scale = MAX_WIDTH / img.width;
-            canvas.width = MAX_WIDTH;
+            const MAX_WIDTH = 600;
+            const scale = Math.min(MAX_WIDTH / img.width, 1);
+            canvas.width = img.width * scale;
             canvas.height = img.height * scale;
+            
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.6).split(',')[1]);
           };
-          img.src = readerEvent.target.result;
+          img.onerror = reject;
+          img.src = e.target.result;
         };
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
     }
 
-async function callGeminiVision(base64Image) {
+    async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
-      // Updated to match the recommended model from the error message
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
-      const prompt = `Analyze this food image. Estimate portion sizes and return ONLY a valid JSON object (no markdown, no backticks) with keys:
-      "name" (short description of the meal),
-      "cals" (total calories as integer),
-      "grams" (estimated total weight in grams as integer),
-      "carbs" (grams as integer),
-      "protein" (grams as integer),
-      "fat" (grams as integer)`;
+      const prompt = `Analyze this food image. Estimate portion sizes and return ONLY valid raw JSON with keys: "name" (short string), "cals" (integer), "grams" (integer), "carbs" (integer), "protein" (integer), "fat" (integer). No commentary, no markdown.`;
 
       const payload = {
         contents: [{
@@ -403,24 +477,39 @@ async function callGeminiVision(base64Image) {
             { text: prompt },
             { inline_data: { mime_type: "image/jpeg", data: base64Image } }
           ]
-        }]
+        }],
+        generationConfig: {
+          response_mime_type: "application/json"
+        }
       };
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
-      const resData = await response.json();
-      if (resData.error) throw new Error(resData.error.message);
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
 
-      let text = resData.candidates[0].content.parts[0].text.trim();
-      text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-      const meal = JSON.parse(text);
+        const resData = await response.json();
+        if (resData.error) throw new Error(resData.error.message);
 
-      base100g = null;
-      openEditModal(meal.name, meal.cals, meal.carbs, meal.protein, meal.fat, meal.grams, false);
+        const rawText = resData.candidates[0].content.parts[0].text;
+        const cleanJson = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const meal = JSON.parse(cleanJson);
+
+        editingIndex = null;
+        openEditModal(meal.name, meal.cals, meal.carbs, meal.protein, meal.fat, meal.grams, false);
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          throw new Error("Analysis timed out. Please try again.");
+        }
+        throw err;
+      }
     }
 
     function promptApiKey() {
