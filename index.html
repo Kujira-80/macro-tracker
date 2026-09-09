@@ -50,6 +50,7 @@
     .nav-btn { flex: 1; border: none; background: #0f172a; color: white; border-radius: 12px; padding: 14px 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
     .nav-btn.secondary { background: #3b82f6; }
 
+    /* Modals & Overlays */
     #scanner-modal, #portion-modal, #loading-modal { 
       display: none; 
       position: fixed; 
@@ -76,6 +77,7 @@
     .btn-save { background: var(--primary); color: white; }
     .btn-dismiss { background: #f1f5f9; color: var(--text); }
 
+    /* Loading Spinner */
     .loading-card { background: white; padding: 30px; border-radius: 20px; text-align: center; max-width: 280px; }
     .spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -139,11 +141,13 @@
     <input type="file" id="camera-file" accept="image/*" capture="environment" style="display: none;" />
   </div>
 
+  <!-- Barcode Scanner Modal -->
   <div id="scanner-modal">
     <div id="reader"></div>
     <button class="close-btn" id="close-scanner">Cancel</button>
   </div>
 
+  <!-- Portion / Edit Modal -->
   <div id="portion-modal">
     <div class="portion-box">
       <h3 id="item-title">Product</h3>
@@ -187,6 +191,7 @@
     </div>
   </div>
 
+  <!-- Loading Modal -->
   <div id="loading-modal">
     <div class="loading-card">
       <div class="spinner"></div>
@@ -286,6 +291,7 @@
       render();
     });
 
+    // Barcode scanner logic
     document.getElementById("open-scanner").addEventListener("click", () => {
       scannerModal.style.display = "flex";
       isScanning = true;
@@ -336,6 +342,7 @@
       }
     }
 
+    // Photo AI scanner logic
     const fileInput = document.getElementById("camera-file");
     document.getElementById("snap-meal").addEventListener("click", () => {
       const apiKey = localStorage.getItem("gemini_key");
@@ -384,9 +391,8 @@
       });
     }
 
-   async function callGeminiVision(base64Image) {
+    async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
-      // Use standard v1beta endpoint with the key attached directly to the URL
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
       const prompt = `Analyze this food image. Estimate portion sizes and return ONLY a valid JSON object (no markdown, no backticks) with keys:
@@ -415,35 +421,6 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const resData = await response.json();
-      if (resData.error) throw new Error(resData.error.message);
-
-      let text = resData.candidates[0].content.parts[0].text.trim();
-      text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-      const meal = JSON.parse(text);
-
-      base100g = null;
-      openEditModal(meal.name, meal.cals, meal.carbs, meal.protein, meal.fat, meal.grams, false);
-    }
-
-      const payload = {
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: "image/jpeg", data: base64Image } }
-          ]
-        }]
-      };
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
         },
         body: JSON.stringify(payload)
       });
