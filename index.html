@@ -384,7 +384,7 @@
       });
     }
 
-async function callGeminiVision(base64Image) {
+    async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -421,20 +421,7 @@ async function callGeminiVision(base64Image) {
       base100g = null;
       openEditModal(meal.name, meal.cals, meal.carbs, meal.protein, meal.fat, meal.grams, false);
     }
-          let text = resData.candidates[0].content.parts[0].text.trim();
-          text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-          const meal = JSON.parse(text);
 
-          base100g = null;
-          openEditModal(meal.name, meal.cals, meal.carbs, meal.protein, meal.fat, meal.grams, false);
-          return; // Success!
-        } catch (err) {
-          lastError = err;
-        }
-      }
-
-      throw lastError || new Error("All model endpoints busy. Please try once more in a few seconds.");
-    }
     function promptApiKey() {
       const current = localStorage.getItem("gemini_key") || "";
       const key = prompt("Enter your Gemini API Key:", current);
