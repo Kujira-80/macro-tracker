@@ -43,6 +43,7 @@
     .log-section { margin-top: 28px; }
     .log-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); margin-bottom: 12px; }
     
+    /* Swipeable List Items */
     .swipe-container { position: relative; margin-bottom: 10px; border-radius: 14px; overflow: hidden; background: #e2e8f0; }
     .swipe-actions { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 0.9rem; color: white; }
     .swipe-action-left { background: var(--edit); width: 50%; height: 100%; display: flex; align-items: center; padding-left: 20px; }
@@ -408,7 +409,7 @@
       }
     }
 
-    // Photo Meal using gemini-3.6-flash Interactions API
+    // Photo Meal (Gemini 3.6 Flash)
     const fileInput = document.getElementById("camera-file");
     document.getElementById("snap-meal").addEventListener("click", () => {
       const apiKey = localStorage.getItem("gemini_key");
@@ -435,6 +436,7 @@
       }
     });
 
+    // 400px width keeps base64 payload under 35KB for rapid upload
     function resizeImageToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -442,14 +444,14 @@
           const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 300;
+            const MAX_WIDTH = 400;
             const scale = Math.min(MAX_WIDTH / img.width, 1);
             canvas.width = Math.round(img.width * scale);
             canvas.height = Math.round(img.height * scale);
             
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.5).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.6).split(',')[1]);
           };
           img.onerror = reject;
           img.src = e.target.result;
@@ -461,33 +463,28 @@
 
     async function callGeminiVision(base64Image) {
       const apiKey = localStorage.getItem("gemini_key");
-      const url = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${apiKey}`;
+      // Direct generateContent endpoint with gemini-3.6-flash
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
-      const promptText = `Analyze this food image. Estimate portion sizes and macros.
-Return ONLY a valid JSON object matching this structure:
-{"name": "Food description", "cals": 80, "grams": 150, "carbs": 19, "protein": 1, "fat": 0}`;
+      const prompt = `Analyze this food image. Estimate portion sizes and return ONLY a single valid raw JSON object (no commentary, no markdown) with keys:
+"name" (short description),
+"cals" (integer),
+"grams" (integer),
+"carbs" (integer),
+"protein" (integer),
+"fat" (integer)`;
 
-      // This uses the correct Interactions API Schema: type: "user_input" and a "content" array
       const payload = {
-        model: "gemini-3.6-flash",
-        input: [
-          {
-            type: "user_input",
-            content: [
-              { text: promptText },
-              {
-                inlineData: {
-                  mimeType: "image/jpeg",
-                  data: base64Image
-                }
-              }
-            ]
-          }
-        ]
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+          ]
+        }]
       };
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const timeout = setTimeout(() => controller.abort(), 25000);
 
       try {
         const response = await fetch(url, {
@@ -499,25 +496,11 @@ Return ONLY a valid JSON object matching this structure:
         clearTimeout(timeout);
 
         const resData = await response.json();
-        if (resData.error) {
-          throw new Error(resData.error.message);
-        }
+        if (resData.error) throw new Error(resData.error.message);
 
-        let text = "";
-        if (resData.output_text) {
-          text = resData.output_text;
-        } else if (resData.steps && resData.steps.length) {
-          const modelStep = resData.steps.find(s => s.type === "model_output" || s.output_text);
-          text = modelStep ? (modelStep.output_text || JSON.stringify(modelStep)) : JSON.stringify(resData.steps);
-        } else if (resData.outputs && resData.outputs.length) {
-          text = resData.outputs[0].text || "";
-        } else {
-          text = JSON.stringify(resData);
-        }
-
-        const match = text.match(/\{[\s\S]*\}/);
+        const rawText = resData.candidates[0].content.parts[0].text;
+        const match = rawText.match(/\{[\s\S]*\}/);
         if (!match) throw new Error("Could not parse food data from response.");
-
         const meal = JSON.parse(match[0]);
 
         editingIndex = null;
@@ -532,7 +515,7 @@ Return ONLY a valid JSON object matching this structure:
         );
       } catch (err) {
         if (err.name === 'AbortError') {
-          throw new Error("Analysis timed out. Please check your signal.");
+          throw new Error("Analysis timed out. Please try again.");
         }
         throw err;
       }
